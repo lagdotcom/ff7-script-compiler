@@ -2,41 +2,41 @@ from io import BytesIO
 from struct import unpack
 from typing import BinaryIO
 
-from ops import OP_ADD, OP_ADDR_BIT, OP_ADDR_BYTE, OP_ADDR_THREE, OP_ADDR_WORD, OP_AND, OP_ATTACK, OP_BITWISE_AND, OP_BITWISE_NOT, OP_BITWISE_OR, OP_COPY_UNIT, OP_COUNT, OP_DEBUG, OP_DIV, OP_ELEMENTAL_DEFENCE, OP_END, OP_EQ, OP_GE, OP_GREATEST, OP_GT, OP_CASE, OP_JP, OP_JZ, OP_LE, OP_LEAST, OP_LINK_CHARACTER, OP_LOADSAVE, OP_LT, OP_MASK, OP_MOD, OP_MP_COST, OP_MUL, OP_NE, OP_NOT, OP_OR, OP_POP, OP_POP2_A1, OP_POP_74, OP_PUSH_BYTE, OP_PUSH_THREE, OP_PUSH_WORD, OP_RANDOM, OP_RANDOM_BIT, OP_READ_BIT, OP_READ_BYTE, OP_READ_THREE, OP_READ_WORD, OP_SAY, OP_SHIFT, OP_SUB, OP_WRITE
+from ops import Op
+from tools import hexBytes
 
 
-def hexBytes(by: bytes) -> str:
-    s = '$'
-    for b in by:
-        s += '%02x' % b
-    return s
+class NumberOperand:
+    size: int
+    raw: bytes
 
-
-class Op:
     def __init__(self, f: BinaryIO, size: int):
         self.size = size
-        self.raw = f.read(size)
+        self.raw = f.read(size)[::-1]
 
     def __repr__(self):
         return hexBytes(self.raw)
 
 
-class ByteOp(Op):
+class ByteOp(NumberOperand):
     def __init__(self, f: BinaryIO):
-        Op.__init__(self, f, 1)
+        NumberOperand.__init__(self, f, 1)
 
 
-class WordOp(Op):
+class WordOp(NumberOperand):
     def __init__(self, f: BinaryIO):
-        Op.__init__(self, f, 2)
+        NumberOperand.__init__(self, f, 2)
 
 
-class ThreeOp(Op):
+class ThreeOp(NumberOperand):
     def __init__(self, f: BinaryIO):
-        Op.__init__(self, f, 3)
+        NumberOperand.__init__(self, f, 3)
 
 
-class StringOp:
+class StringOperand:
+    size: int
+    raw: bytes
+
     def __init__(self, f: BinaryIO):
         size = 0
         str = bytes()
@@ -52,89 +52,89 @@ class StringOp:
 
 
 ops = {
-    OP_READ_BIT: 'read.bit',
-    OP_READ_BYTE: 'read.b',
-    OP_READ_WORD: 'read.w',
-    OP_READ_THREE: 'read.3',
+    Op.READ_BIT: 'read.bit',
+    Op.READ_BYTE: 'read.b',
+    Op.READ_WORD: 'read.w',
+    Op.READ_THREE: 'read.3',
 
-    OP_ADDR_BIT: 'ref.bit',
-    OP_ADDR_BYTE: 'ref.b',
-    OP_ADDR_WORD: 'ref.w',
-    OP_ADDR_THREE: 'ref.3',
+    Op.ADDR_BIT: 'ref.bit',
+    Op.ADDR_BYTE: 'ref.b',
+    Op.ADDR_WORD: 'ref.w',
+    Op.ADDR_THREE: 'ref.3',
 
-    OP_ADD: 'add',
-    OP_SUB: 'sub',
-    OP_MUL: 'mul',
-    OP_DIV: 'div',
-    OP_MOD: 'mod',
-    OP_BITWISE_AND: 'bit.and',
-    OP_BITWISE_OR: 'bit.or',
-    OP_BITWISE_NOT: 'bit.not',
+    Op.ADD: 'add',
+    Op.SUB: 'sub',
+    Op.MUL: 'mul',
+    Op.DIV: 'div',
+    Op.MOD: 'mod',
+    Op.BITWISE_AND: 'bit.and',
+    Op.BITWISE_OR: 'bit.or',
+    Op.BITWISE_NOT: 'bit.not',
 
-    OP_EQ: 'eq',
-    OP_NE: 'ne',
-    OP_GE: 'ge',
-    OP_LE: 'le',
-    OP_GT: 'gt',
-    OP_LT: 'lt',
+    Op.EQ: 'eq',
+    Op.NE: 'ne',
+    Op.GE: 'ge',
+    Op.LE: 'le',
+    Op.GT: 'gt',
+    Op.LT: 'lt',
 
-    OP_AND: 'and',
-    OP_OR: 'or',
-    OP_NOT: 'not',
+    Op.AND: 'and',
+    Op.OR: 'or',
+    Op.NOT: 'not',
 
-    OP_PUSH_BYTE: 'push.b',
-    OP_PUSH_WORD: 'push.w',
-    OP_PUSH_THREE: 'push.3',
+    Op.PUSH_BYTE: 'push.b',
+    Op.PUSH_WORD: 'push.w',
+    Op.PUSH_THREE: 'push.3',
 
-    OP_JZ: 'jz',
-    OP_CASE: 'j_case',
-    OP_JP: 'jp',
-    OP_END: 'end',
-    OP_POP_74: 'pop_74',
-    OP_LINK_CHARACTER: 'link_char',
+    Op.JZ: 'jz',
+    Op.CASE: 'j_case',
+    Op.JP: 'jp',
+    Op.END: 'end',
+    Op.POP_74: 'pOp.74',
+    Op.LINK_CHARACTER: 'link_char',
 
-    OP_MASK: 'mask',
-    OP_RANDOM: 'random',
-    OP_RANDOM_BIT: 'random.bit',
-    OP_COUNT: 'count',
-    OP_GREATEST: 'set_greatest',
-    OP_LEAST: 'set_least',
-    OP_MP_COST: 'mp_cost',
-    OP_SHIFT: 'shift',
+    Op.MASK: 'mask',
+    Op.RANDOM: 'random',
+    Op.RANDOM_BIT: 'random.bit',
+    Op.COUNT: 'count',
+    Op.GREATEST: 'set_greatest',
+    Op.LEAST: 'set_least',
+    Op.MP_COST: 'mp_cost',
+    Op.SHIFT: 'shift',
 
-    OP_WRITE: 'write',
-    OP_POP: 'pop',
-    OP_ATTACK: 'attack',
-    OP_SAY: 'say',
-    OP_COPY_UNIT: 'copy_unit',
-    OP_LOADSAVE: 'load_save',
-    OP_ELEMENTAL_DEFENCE: 'elemental_defence',
+    Op.WRITE: 'write',
+    Op.POP: 'pop',
+    Op.ATTACK: 'attack',
+    Op.SAY: 'say',
+    Op.COPY_UNIT: 'copy_unit',
+    Op.LOADSAVE: 'load_save',
+    Op.ELEMENTAL_DEFENCE: 'elemental_defence',
 
-    OP_DEBUG: 'debug',
-    OP_POP2_A1: 'pop2_a1'
+    Op.DEBUG: 'debug',
+    Op.POP2_A1: 'pop2_a1'
 }
 
 args = {
-    OP_READ_BIT: WordOp,
-    OP_READ_BYTE: WordOp,
-    OP_READ_WORD: WordOp,
-    OP_READ_THREE: WordOp,
+    Op.READ_BIT: WordOp,
+    Op.READ_BYTE: WordOp,
+    Op.READ_WORD: WordOp,
+    Op.READ_THREE: WordOp,
 
-    OP_ADDR_BIT: WordOp,
-    OP_ADDR_BYTE: WordOp,
-    OP_ADDR_WORD: WordOp,
-    OP_ADDR_THREE: WordOp,
+    Op.ADDR_BIT: WordOp,
+    Op.ADDR_BYTE: WordOp,
+    Op.ADDR_WORD: WordOp,
+    Op.ADDR_THREE: WordOp,
 
-    OP_PUSH_BYTE: ByteOp,
-    OP_PUSH_WORD: WordOp,
-    OP_PUSH_THREE: ThreeOp,
+    Op.PUSH_BYTE: ByteOp,
+    Op.PUSH_WORD: WordOp,
+    Op.PUSH_THREE: ThreeOp,
 
-    OP_JZ: WordOp,
-    OP_CASE: WordOp,
-    OP_JP: WordOp,
+    Op.JZ: WordOp,
+    Op.CASE: WordOp,
+    Op.JP: WordOp,
 
-    OP_SAY: StringOp,
-    OP_DEBUG: StringOp
+    Op.SAY: StringOperand,
+    Op.DEBUG: StringOperand
 }
 
 
@@ -145,9 +145,9 @@ def disassemble(f: BinaryIO):
         code = f.read(1)
         if not len(code):
             break
-        op = code[0]
+        op = Op(code[0])
         if op not in ops:
-            print("Unknown opcode: %02x" % op)
+            print("Unknown opcode: %s" % op)
             break
         mne = ops[op]
         if op in args:
