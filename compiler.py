@@ -396,6 +396,8 @@ class Compiler:
 
     def endScope(self):
         self.scopeDepth -= 1
+        if self.scopeDepth == 0:
+            self.compiling.end()
 
     def block(self):
         while not self.check(TokenType.RIGHT_BRACE) and not self.check(TokenType.EOF):
@@ -545,5 +547,5 @@ def doRandom(self: Compiler):
 
 
 startingEnvironment = {
-    "random": OpFunction("random", doRandom)
+    "Random": OpFunction("Random", doRandom)
 }
