@@ -186,8 +186,8 @@ class Chunk:
     def jz(self, addr: int) -> int:
         return self.raw(Op.JZ.value, *splitWord(addr))
 
-    def case(self, addr: int) -> int:
-        return self.raw(Op.CASE.value, *splitWord(addr))
+    def jneq(self, addr: int) -> int:
+        return self.raw(Op.JNEQ.value, *splitWord(addr))
 
     def jp(self, addr: int) -> int:
         return self.raw(Op.JP.value, *splitWord(addr))
@@ -503,7 +503,7 @@ class Compiler:
             else:
                 self.consume(TokenType.CASE, "Expect 'case'.")
                 self.expression()
-                prevJump = self.emitJump(Op.CASE)
+                prevJump = self.emitJump(Op.JNEQ)
                 self.consume(TokenType.COLON, "Expect ':' after condition.")
             if len(skipJumps):
                 for skipJump in skipJumps:
@@ -721,6 +721,12 @@ def doPrint(self: Compiler):
 
 
 builtins = {
+    "EnemyAttack": Constant("EnemyAttack", Size.BYTE, 0x20),
+
+    "Target": Constant("Target", Size.WORD, 0x2070),
+    "Opponents": Constant("Opponents", Size.WORD, 0x20A0),
+    "PreviousAttacker": Constant("PreviousAttacker", Size.WORD, 0x40D0),
+
     "MyHP": Builtin("MyHP", doMyHP),
     "MyMaxHP": Builtin("MyMaxHP", doMyMaxHP),
     "Perform": Builtin("Perform", doPerform),

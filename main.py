@@ -4,7 +4,7 @@ from smart_arg import arg_suite
 from typing import NamedTuple
 
 from compiler import Compiler
-from disassembler import disassemble
+from disassembler import disassemble, toProudCloudFormat
 
 
 @arg_suite
@@ -20,6 +20,7 @@ def process(a: Args):
         print("==", chunk.name)
         buf = BytesIO(chunk.code)
         disassemble(buf)
+        print()
 
 
 if __name__ == '__main__':

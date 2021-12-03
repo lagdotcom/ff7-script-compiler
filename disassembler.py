@@ -50,8 +50,12 @@ class StringOperand:
         self.size = size
         self.raw = str
 
-    def __repr__(self):
+    @property
+    def asString(self):
         return str(self.raw[:-1], 'utf-8')
+
+    def __repr__(self):
+        return self.asString
 
 
 ops = {
@@ -90,7 +94,7 @@ ops = {
     Op.PUSH_THREE: 'push.3',
 
     Op.JZ: 'jz',
-    Op.CASE: 'j_case',
+    Op.JNEQ: 'jneq',
     Op.JP: 'jp',
     Op.END: 'end',
     Op.POP_74: 'pOp.74',
@@ -133,12 +137,37 @@ args = {
     Op.PUSH_THREE: ThreeOp,
 
     Op.JZ: WordOp,
-    Op.CASE: WordOp,
+    Op.JNEQ: WordOp,
     Op.JP: WordOp,
 
     Op.SAY: StringOperand,
     Op.DEBUG: StringOperand
 }
+
+
+def toProudCloudFormat(f: BinaryIO):
+    i = 0
+    while True:
+        old = f.tell()
+        code = f.read(1)
+        if not len(code):
+            break
+        op = Op(code[0])
+        if op not in ops:
+            print("Unknown opcode: %s" % op)
+            break
+        mne = ops[op]
+        if op in args:
+            arg = args[op](f)
+            if op == Op.DEBUG or op == Op.SAY:
+                argPrint = '\t' + arg.asString
+            else:
+                argPrint = '\t' + hexBytes(arg.raw)[1:]
+        else:
+            arg = ''
+            argPrint = ''
+        print("%02x%s" % (code[0], argPrint))
+        i += f.tell() - old
 
 
 def disassemble(f: BinaryIO):

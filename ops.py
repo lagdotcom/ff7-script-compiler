@@ -37,7 +37,7 @@ class Op(Enum):
     PUSH_THREE = 0x62
 
     JZ = 0x70
-    CASE = 0x71  # Jumps to script address in argument if pop and top of stack are not equal
+    JNEQ = 0x71  # Jumps to script address in argument if pop and top of stack are not equal
     JP = 0x72
     END = 0x73
     POP_74 = 0x74  # unused
