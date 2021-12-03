@@ -25,7 +25,7 @@ class Variable(NamedTuple):
         return "var %s %s at %x" % (self.size.name, self.name, self.addr)
 
 
-class OpFunction(NamedTuple):
+class Builtin(NamedTuple):
     name: str
     perform: any  # Callable[[Compiler], None]
 
@@ -45,12 +45,19 @@ class Chunk:
         self.line = 0
         self.lines = []
 
+    @property
+    def len(self) -> int:
+        return len(self.code)
+
     def raw(self, *b: int) -> int:
         dst = bytes(b)
         self.code += dst
         self.lines += [self.line] * len(dst)
         #print('wrote:', hexBytes(dst))
         return len(dst)
+
+    def patch(self, pos: int, *b: int):
+        self.code = self.code[:pos] + bytes(b) + self.code[pos+len(b):]
 
     def read(self, var: Constant | Variable) -> int:
         if isinstance(var, Constant):
@@ -254,12 +261,12 @@ class Compiler:
     compiling: Chunk
     scanner: Scanner
     parser: Parser
-    declarations: dict[str, Constant | OpFunction | Variable]
+    declarations: dict[str, Constant | Builtin | Variable]
     scopeDepth: int
 
     def __init__(self):
         self.chunks = []
-        self.declarations = startingEnvironment.copy()
+        self.declarations = builtins.copy()
         self.scopeDepth = 0
 
     @property
@@ -345,7 +352,7 @@ class Compiler:
             return
         var = self.declarations[name.value]
 
-        if isinstance(var, OpFunction):
+        if isinstance(var, Builtin):
             var.perform(self)
             return
 
@@ -353,6 +360,8 @@ class Compiler:
             self.compiling.ref(var)
             self.expression()
             self.compiling.write()
+        elif isinstance(var, Constant):
+            self.compiling.push(var.value)
         else:
             self.compiling.read(var)
 
@@ -404,6 +413,112 @@ class Compiler:
             self.declaration()
         self.consume(TokenType.RIGHT_BRACE, "Expect '}' after block.")
 
+    def emitJump(self, op: Op):
+        self.compiling.raw(op.value, 0xff, 0xff)
+        return self.compiling.len - 2
+
+    def patchJump(self, pos: int):
+        dest = self.compiling.len
+        self.compiling.patch(pos, *splitWord(dest))
+
+    def ifStatement(self):
+        self.consume(TokenType.LEFT_PAREN, "Expect '(' after 'if'.")
+        self.expression()
+        self.consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.")
+
+        thenJump = self.emitJump(Op.JZ)
+        self.statement()
+
+        if self.match(TokenType.ELSE):
+            elseJump = self.emitJump(Op.JP)
+            self.patchJump(thenJump)
+            self.statement()
+            self.patchJump(elseJump)
+        else:
+            self.patchJump(thenJump)
+
+    def whileStatement(self):
+        loopStart = self.compiling.len
+        self.consume(TokenType.LEFT_PAREN, "Expect '(' after 'while'.")
+        self.expression()
+        self.consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.")
+
+        exitJump = self.emitJump(Op.JZ)
+        self.statement()
+        self.compiling.jp(loopStart)
+
+        self.patchJump(exitJump)
+
+    def forStatement(self):
+        self.consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'.")
+        if not self.match(TokenType.SEMICOLON):
+            self.expressionStatement()
+
+        loopStart = self.compiling.len
+        if not self.match(TokenType.SEMICOLON):
+            self.expression()
+            self.consume(TokenType.SEMICOLON,
+                         "Expect ';' after loop condition.")
+            exitJump = self.emitJump(Op.JZ)
+
+        if not self.match(TokenType.RIGHT_PAREN):
+            bodyJump = self.emitJump(Op.JP)
+            incrementStart = self.compiling.len
+            self.expression()
+            self.consume(TokenType.RIGHT_PAREN,
+                         "Expect ')' after for clauses.")
+            self.compiling.jp(loopStart)
+            loopStart = incrementStart
+            self.patchJump(bodyJump)
+
+        self.statement()
+        self.compiling.jp(loopStart)
+        if exitJump:
+            self.patchJump(exitJump)
+
+    def caseStatements(self):
+        while not self.match(TokenType.BREAK):
+            if self.check(TokenType.RIGHT_BRACE):
+                return
+            self.statement()
+        self.consume(TokenType.SEMICOLON, "Expect ';' after 'break'.")
+        # TODO don't output this for last case in switch
+        return self.emitJump(Op.JP)
+
+    def switchStatement(self):
+        self.consume(TokenType.LEFT_PAREN, "Expect '(' after 'switch'.")
+        self.expression()
+        self.consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.")
+
+        self.consume(TokenType.LEFT_BRACE, "Expect '{'.")
+
+        prevJump = None
+        skipJumps = []
+        endJumps = []
+        while not self.match(TokenType.RIGHT_BRACE):
+            if prevJump:
+                self.patchJump(prevJump)
+            if self.match(TokenType.DEFAULT):
+                self.consume(TokenType.COLON, "Expect ':' after 'default'.")
+            else:
+                self.consume(TokenType.CASE, "Expect 'case'.")
+                self.expression()
+                prevJump = self.emitJump(Op.CASE)
+                self.consume(TokenType.COLON, "Expect ':' after condition.")
+            if len(skipJumps):
+                for skipJump in skipJumps:
+                    self.patchJump(skipJump)
+                skipJumps = []
+            if self.check(TokenType.CASE):
+                skipJumps.append(self.emitJump(Op.JP))
+                continue
+            endJump = self.caseStatements()
+            if endJump:
+                endJumps.append(endJump)
+        for endJump in endJumps:
+            self.patchJump(endJump)
+        self.compiling.pop()
+
     def statement(self):
         if self.match(TokenType.CONST):
             self.constDeclaration()
@@ -415,6 +530,14 @@ class Compiler:
             self.beginScope()
             self.block()
             self.endScope()
+        elif self.match(TokenType.IF):
+            self.ifStatement()
+        elif self.match(TokenType.WHILE):
+            self.whileStatement()
+        elif self.match(TokenType.FOR):
+            self.forStatement()
+        elif self.match(TokenType.SWITCH):
+            self.switchStatement()
         else:
             self.expressionStatement()
 
@@ -506,6 +629,10 @@ def binary(self: Compiler, canAssign: bool):
         self.compiling.lt()
     elif operatorType == TokenType.LESS_EQUAL:
         self.compiling.le()
+    elif operatorType == TokenType.AND:
+        self.compiling.logAnd()
+    elif operatorType == TokenType.OR:
+        self.compiling.logOr()
 
 
 def variable(self: Compiler, canAssign: bool):
@@ -529,7 +656,9 @@ rules = {
     TokenType.MORE_EQUAL: ParseRule(None, binary, Precedence.COMPARISON),
     TokenType.LESS: ParseRule(None, binary, Precedence.COMPARISON),
     TokenType.LESS_EQUAL: ParseRule(None, binary, Precedence.COMPARISON),
-    TokenType.IDENTIFIER: ParseRule(variable, None, Precedence.NONE)
+    TokenType.IDENTIFIER: ParseRule(variable, None, Precedence.NONE),
+    TokenType.AND: ParseRule(None, binary, Precedence.AND),
+    TokenType.OR: ParseRule(None, binary, Precedence.OR),
 }
 
 
@@ -540,12 +669,62 @@ def getRule(type: TokenType) -> ParseRule:
 
 
 def doRandom(self: Compiler):
-    self.compiling.random()
     # TODO this sucks
-    self.consume(TokenType.LEFT_PAREN, "Expect '(' after random.")
-    self.consume(TokenType.RIGHT_PAREN, "Expect ')' after random(.")
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.random()
 
 
-startingEnvironment = {
-    "Random": OpFunction("Random", doRandom)
+def doRandomBit(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.parsePrecedence(Precedence.CALL)
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.randomBit()
+
+
+def doPerform(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.parsePrecedence(Precedence.CALL)
+    self.consume(TokenType.COMMA, "Expect ','.")
+    self.parsePrecedence(Precedence.CALL)
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.attack()
+
+
+def doMyHP(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.readWord(0x2060)
+    self.compiling.readThree(0x4160)
+    self.compiling.mask()
+
+
+def doMyMaxHP(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.readWord(0x2060)
+    self.compiling.readThree(0x4180)
+    self.compiling.mask()
+
+
+def doPrint(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.consume(TokenType.STRING, "Expect string.")
+    message = self.previous
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.say(message.value[1:-1])
+
+
+builtins = {
+    "MyHP": Builtin("MyHP", doMyHP),
+    "MyMaxHP": Builtin("MyMaxHP", doMyMaxHP),
+    "Perform": Builtin("Perform", doPerform),
+    "Print": Builtin("Print", doPrint),
+    "Random": Builtin("Random", doRandom),
+    "RandomBit": Builtin("RandomBit", doRandomBit),
 }

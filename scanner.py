@@ -49,12 +49,14 @@ class TokenType(Enum):
     CONST = auto()
     DEFAULT = auto()
     ELSE = auto()
+    FOR = auto()
     IF = auto()
     OR = auto()
     SCRIPT = auto()
     SWITCH = auto()
     TRIPLE = auto()
     VAR = auto()
+    WHILE = auto()
     WORD = auto()
 
     ERROR = auto()
@@ -100,11 +102,13 @@ reservedWords = {
     'const': TokenType.CONST,
     'default': TokenType.DEFAULT,
     'else': TokenType.ELSE,
+    'for': TokenType.FOR,
     'if': TokenType.IF,
     'script': TokenType.SCRIPT,
     'switch': TokenType.SWITCH,
     'triple': TokenType.TRIPLE,
     'var': TokenType.VAR,
+    'while': TokenType.WHILE,
     'word': TokenType.WORD,
 }
 

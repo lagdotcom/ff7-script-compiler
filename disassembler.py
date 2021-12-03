@@ -50,6 +50,9 @@ class StringOperand:
         self.size = size
         self.raw = str
 
+    def __repr__(self):
+        return str(self.raw, 'utf-8')
+
 
 ops = {
     Op.READ_BIT: 'read.bit',
