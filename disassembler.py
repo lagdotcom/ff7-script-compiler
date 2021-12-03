@@ -44,14 +44,14 @@ class StringOperand:
             size += 1
             bs = f.read(1)
             b = bs[0]
+            str += bs
             if b == 0 or b == 255:
                 break
-            str += bs
         self.size = size
         self.raw = str
 
     def __repr__(self):
-        return str(self.raw, 'utf-8')
+        return str(self.raw[:-1], 'utf-8')
 
 
 ops = {
@@ -155,9 +155,13 @@ def disassemble(f: BinaryIO):
         mne = ops[op]
         if op in args:
             arg = args[op](f)
-            print("%03x %s %s" % (i, mne, arg))
+            argHex = hexBytes(arg.raw)[1:]
+            if len(argHex) > 6:
+                argHex = argHex[:3] + '...'
         else:
-            print("%03x %s" % (i, mne))
+            arg = ''
+            argHex = ''
+        print("%03x %02x\t%-6s %s %s" % (i, code[0], argHex, mne, arg))
         i += f.tell() - old
 
 

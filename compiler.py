@@ -282,7 +282,7 @@ class Compiler:
             self.parser.error("Variable redeclaration: %s" % thing.name)
             return
         self.declarations[thing.name] = thing
-        print(thing)
+        # print(thing)
 
     def chunk(self, name: str):
         ch = Chunk(name)
