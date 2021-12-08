@@ -1,0 +1,101 @@
+const word DiamondFire = 0x03D2;
+const word FootStamp = 0x03D3;
+const word DiamondFire2 = 0x03D4;
+const word DiamondFlash = 0x03D6;
+const word CountdownMode = 0x011F;
+const word NormalMode = 0x0120;
+const word Report = 0x0164;
+
+var byte Count at 0x0000;
+var byte LSCount at 0x0020;
+var byte FlashLimit at 0x0040;
+var byte Stage at 0x0060;
+
+script main {
+  switch (Count) {
+    case 0:
+      TargetMask = RandomBit(AllOpponentMask);
+      Perform(EnemyAttack, DiamondFire);
+      if (Random() % 3 != 0) {
+        Count = 1;
+      }
+      break;
+
+    case 1:
+      TargetMask = RandomBit(Greatest(Mask(AllOpponentMask, HP)));
+      Perform(EnemyAttack, FootStamp);
+      if (Random() % 4 != 0) {
+        Count = 0;
+      }
+      break;
+
+    case 2:
+      Print("Countdown");
+      TargetMask = Self;
+      Perform(EnemyAttack, CountdownMode);
+      WriteFlag(Self, IdleAnimID, 7);
+      WriteFlag(Self, HurtAnimID, 8);
+      Stage = 1;
+
+      TargetMask = RandomBit(AllOpponentMask);
+      Perform(EnemyAttack, DiamondFire2);
+      Count = Count + 1;
+      Print("3");
+      break;
+
+    case 3:
+      TargetMask = RandomBit(AllOpponentMask);
+      Perform(EnemyAttack, DiamondFire2);
+      Count = Count + 1;
+      Print("2");
+      break;
+
+    case 4:
+      TargetMask = RandomBit(AllOpponentMask);
+      Perform(EnemyAttack, DiamondFire2);
+      Count = Count + 1;
+      Print("1");
+      break;
+
+    default:
+      Print("0");
+      TargetMask = AllOpponentMask;
+      Perform(EnemyAttack, DiamondFlash);
+
+      TargetMask = Self;
+      Perform(EnemyAttack, NormalMode);
+      Count = 0;
+      LSCount = 0;
+      WriteFlag(Self, IdleAnimID, 0);
+      WriteFlag(Self, HurtAnimID, 1);
+      Stage = 0;
+  }
+}
+
+script deathCounter {
+  if (Stage != 0) {
+    WriteFlag(Self, IdleAnimID, 0);
+    TargetMask = Self;
+    Perform(EnemyAttack, NormalMode);
+  }
+
+  WriteFlag(Self, IdleAnimID, 20);
+  TargetMask = Self;
+  Perform(EnemyAttack, Report);
+  Perform(ExecuteScript, 0x0F);
+}
+
+script preTurnCounter {
+  FlashLimit = 1;
+  if (MyHP() <= MyMaxHP() / 2) {
+    FlashLimit = 2;
+  }
+
+  WriteFlag(Self, PhysicalImmune, 1);
+  if ((PerformedAction == CmdSummon || PerformedAction == CmdWSummon || PerformedAction == CmdLimit) || (Stage == 1)) {
+    WriteFlag(Self, PhysicalImmune, 0);
+    LSCount = LSCount + 1;
+    if (LSCount > FlashLimit && Stage == 0)
+      Count = 2;
+  }
+}

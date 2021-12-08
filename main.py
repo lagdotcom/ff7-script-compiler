@@ -1,10 +1,10 @@
 from io import BytesIO
-import sys
+from sys import argv
 from smart_arg import arg_suite
 from typing import NamedTuple
 
 from compiler import Compiler
-from disassembler import disassemble, toProudCloudFormat
+from disassembler import ProudClodBinary
 
 
 @arg_suite
@@ -19,10 +19,10 @@ def process(a: Args):
     for chunk in c.chunks:
         print("==", chunk.name)
         buf = BytesIO(chunk.code)
-        disassemble(buf)
+        ProudClodBinary(buf)
         print()
 
 
 if __name__ == '__main__':
-    args = Args.__from_argv__(sys.argv[1:])
+    args = Args.__from_argv__(argv[1:])
     process(args)

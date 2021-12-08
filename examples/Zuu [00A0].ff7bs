@@ -1,0 +1,77 @@
+const word Claw = 0x0249;
+const word GreatGale = 0x024A;
+
+var byte Count at 0x0000;
+var byte SpclChance at 0x0020;
+var bit Fury at 0x0040;
+
+script setup
+{
+  Count = Random() % 4;
+  SpclChance = 8;
+}
+
+script main
+{
+  switch (Count)
+  {
+  case 0:
+  case 1:
+    TargetMask = RandomBit(AllOpponentMask);
+    Perform(EnemyAttack, Claw);
+    if (!(Random() % SpclChance))
+    {
+      TargetMask = RandomBit(AllOpponentMask);
+      Perform(EnemyAttack, Claw);
+    }
+    Count = Count + 1;
+    break;
+
+  case 2:
+    TargetMask = RandomBit(AllOpponentMask);
+    Perform(EnemyAttack, Claw);
+    if (!(Random() % SpclChance))
+    {
+      TargetMask = RandomBit(AllOpponentMask);
+      Perform(EnemyAttack, Claw);
+    }
+    if (!(Random() % SpclChance))
+      Count = 3;
+    else
+      Count = 0;
+    break;
+
+  default:
+    TargetMask = AllOpponentMask;
+    Perform(EnemyAttack, GreatGale);
+    Count = 0;
+  }
+}
+
+script counterGeneral
+{
+  if (MyHP() <= MyMaxHP() / 4 * 1)
+  {
+    SpclChance = 2;
+    if (!Fury)
+    {
+      Print("Zuu feels Fury.");
+      Fury = 1;
+      Count = 3;
+    }
+  }
+  else if (MyHP() <= MyMaxHP() / 4 * 2)
+  {
+    SpclChance = 3;
+    if (!Fury)
+    {
+      Print("Zuu feels Fury.");
+      Fury = 1;
+      Count = 3;
+    }
+  }
+  else if (MyHP() <= MyMaxHP() / 4 * 3)
+    SpclChance = 4;
+  else
+    SpclChance = 8;
+}

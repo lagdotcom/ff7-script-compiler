@@ -21,10 +21,10 @@ def splitString(s: str) -> Iterable[int]:
     return chars
 
 
-def hexBytes(by: bytes) -> str:
+def hexBytes(by: bytes, fmt='%02x') -> str:
     s = '$'
     for b in by:
-        s += '%02x' % b
+        s += fmt % b
     return s
 
 

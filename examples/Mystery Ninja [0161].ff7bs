@@ -1,0 +1,86 @@
+const word Fight = 0x0362;
+const word Throw = 0x0361;
+const word SpiderWeb = 0x035E;
+const word Impaler = 0x035F;
+const word FireFang = 0x0360;
+
+var byte Count at 0x0000;
+var bit OpeningAttack at 0x0020;
+
+script Setup {
+  WriteFlag(Self, DeathImmune, 1);
+}
+
+script Main {
+  Count = Count + 1;
+  if (!OpeningAttack) {
+    TargetMask = AllOpponentMask;
+    Perform(EnemyAttack, FireFang);
+    OpeningAttack = 1;
+  } else if (Count > 10) {
+    WriteFlag(Self, Status_Sleep, 0);
+    WriteFlag(Self, Status_Poison, 0);
+    WriteFlag(Self, Status_Confu, 0);
+    WriteFlag(Self, Status_Silence, 0);
+    WriteFlag(Self, Status_Haste, 0);
+    WriteFlag(Self, Status_Slow, 0);
+    WriteFlag(Self, Status_Stop, 0);
+    WriteFlag(Self, Status_Frog, 0);
+    WriteFlag(Self, Status_Small, 0);
+    WriteFlag(Self, Status_SlowNumb, 0);
+    WriteFlag(Self, Status_Petrify, 0);
+    WriteFlag(Self, Status_Regen, 0);
+    WriteFlag(Self, Status_DeathSentence, 0);
+    WriteFlag(Self, Status_Manipulate, 0);
+    WriteFlag(Self, Status_Berserk, 0);
+    WriteFlag(Self, Status_Paralysis, 0);
+
+    TargetMask = Self;
+    Perform(EnemyAttack, Throw);
+    Perform(ExecuteScript, 0x0F);
+    GlobalAddress = 0;
+    Global(1, 2);
+  } else {
+    switch (Random() % 8) {
+      case 0:
+        if (Mask(AllOpponentMask, Status_Slow) == 0) {
+          TargetMask = RandomBitEq(Mask(AllOpponentMask, Status_Slow), 0);
+          Perform(EnemyAttack, SpiderWeb);
+        } else {
+          TargetMask = AllOpponentMask;
+          Perform(EnemyAttack, FireFang);
+        }
+        break;
+
+      case 1:
+        if (Mask(AllOpponentMask, Status_Frog) == 0) {
+          TargetMask = RandomBitEq(Mask(AllOpponentMask, Status_Frog), 0);
+          Perform(EnemyAttack, Impaler);
+        } else {
+          TargetMask = AllOpponentMask;
+          Perform(EnemyAttack, FireFang);
+        }
+        break;
+
+      case 2:
+      case 3:
+        TargetMask = AllOpponentMask;
+        Perform(EnemyAttack, FireFang);
+        break;
+
+      default:
+        TargetMask = RandomBit(AllOpponentMask);
+        Perform(EnemyAttack, Fight);
+    }
+  }
+}
+
+script counterDeath {
+  GlobalAddress = 0x11;
+  Global(1, 2);
+}
+
+script custom8 {
+  WriteFlag(Self, Enabled, 0);
+  WriteFlag(Self, MainScriptActive, 0);
+}

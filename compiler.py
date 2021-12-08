@@ -1,10 +1,11 @@
 
 from typing import Callable, NamedTuple, Optional
+
 from enums import Precedence, Size
 from ops import Op
 from parser import Parser
 from scanner import Token, TokenType, Scanner
-from tools import asNumber, hexBytes, splitString, splitThree, splitWord
+from tools import asNumber, splitString, splitThree, splitWord
 
 
 class Constant(NamedTuple):
@@ -266,7 +267,7 @@ class Compiler:
 
     def __init__(self):
         self.chunks = []
-        self.declarations = builtins.copy()
+        self.declarations = startingEnv.copy()
         self.scopeDepth = 0
 
     @property
@@ -344,6 +345,12 @@ class Compiler:
     def parseVariable(self, message: str):
         self.consume(TokenType.IDENTIFIER, message)
         return self.previous.value
+
+    def resolve(self, name: Token):
+        if name.value not in self.declarations:
+            self.parser.error("Undefined variable: %s" % name.value)
+            return
+        return self.declarations[name.value]
 
     def namedVariable(self, name: Token, canAssign: bool):
         #print('namedVariable', name, canAssign)
@@ -495,9 +502,11 @@ class Compiler:
         prevJump = None
         skipJumps = []
         endJumps = []
+        # TODO this code kinda blows
         while not self.match(TokenType.RIGHT_BRACE):
             if prevJump:
                 self.patchJump(prevJump)
+                prevJump = None
             if self.match(TokenType.DEFAULT):
                 self.consume(TokenType.COLON, "Expect ':' after 'default'.")
             else:
@@ -517,6 +526,8 @@ class Compiler:
                 endJumps.append(endJump)
         for endJump in endJumps:
             self.patchJump(endJump)
+        if prevJump:
+            self.patchJump(prevJump)
         self.compiling.pop()
 
     def statement(self):
@@ -683,6 +694,17 @@ def doRandomBit(self: Compiler):
     self.compiling.randomBit()
 
 
+def doRandomBitEq(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.parsePrecedence(Precedence.CALL)
+    self.consume(TokenType.COMMA, "Expect ','.")
+    self.parsePrecedence(Precedence.CALL)
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.eq()
+    self.compiling.randomBit()
+
+
 def doPerform(self: Compiler):
     # TODO this sucks
     self.consume(TokenType.LEFT_PAREN, "Expect '('.")
@@ -720,17 +742,134 @@ def doPrint(self: Compiler):
     self.compiling.say(message.value[1:-1])
 
 
-builtins = {
-    "EnemyAttack": Constant("EnemyAttack", Size.BYTE, 0x20),
+def doMask(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.parsePrecedence(Precedence.CALL)
+    self.consume(TokenType.COMMA, "Expect ','.")
+    self.parsePrecedence(Precedence.CALL)
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.mask()
 
-    "Target": Constant("Target", Size.WORD, 0x2070),
-    "Opponents": Constant("Opponents", Size.WORD, 0x20A0),
-    "PreviousAttacker": Constant("PreviousAttacker", Size.WORD, 0x40D0),
 
-    "MyHP": Builtin("MyHP", doMyHP),
-    "MyMaxHP": Builtin("MyMaxHP", doMyMaxHP),
-    "Perform": Builtin("Perform", doPerform),
-    "Print": Builtin("Print", doPrint),
-    "Random": Builtin("Random", doRandom),
-    "RandomBit": Builtin("RandomBit", doRandomBit),
-}
+def doWriteFlag(self: Compiler):
+    # TODO this is utterly terrible
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.advance()
+    addr = self.resolve(self.previous)
+    self.consume(TokenType.COMMA, "Expect ','.")
+    self.advance()
+    mask = self.resolve(self.previous)
+    self.consume(TokenType.COMMA, "Expect ','.")
+    self.advance()
+    value = self.previous
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.ref(addr)
+    self.compiling.ref(mask)
+    self.compiling.mask()
+    self.compiling.push(asNumber(value.value))
+    self.compiling.write()
+
+
+def doGlobal(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.parsePrecedence(Precedence.ASSIGNMENT)
+    self.consume(TokenType.COMMA, "Expect ','.")
+    self.parsePrecedence(Precedence.ASSIGNMENT)
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.save()
+
+
+def doGreatest(self: Compiler):
+    # TODO this sucks
+    self.consume(TokenType.LEFT_PAREN, "Expect '('.")
+    self.parsePrecedence(Precedence.ASSIGNMENT)
+    self.consume(TokenType.RIGHT_PAREN, "Expect ')'.")
+    self.compiling.greatest()
+
+
+variables: list[Constant | Variable] = [
+    # used with PerformedAction
+    Constant("CmdSummon", Size.BYTE, 0x03),
+    Constant("CmdWSummon", Size.BYTE, 0x16),
+    Constant("CmdLimit", Size.BYTE, 0x14),
+
+    # used with Perform()
+    Constant("EnemyAttack", Size.BYTE, 0x20),
+    Constant("ExecuteScript", Size.BYTE, 0x22),
+
+    Variable("PerformedAction", Size.BYTE, 0x2000),
+    Variable("GlobalAddress", Size.BYTE, 0x2010),
+    Variable("Self", Size.WORD, 0x2060),
+    Variable("TargetMask", Size.WORD, 0x2070),
+    Variable("AllyMask", Size.WORD, 0x2080),
+    Variable("AllActiveMask", Size.WORD, 0x2090),
+    Variable("AllOpponentMask", Size.WORD, 0x20A0),
+
+    Variable("Status_Death", Size.BIT, 0x4000),
+    Variable("Status_NearDeath", Size.BIT, 0x4001),
+    Variable("Status_Sleep", Size.BIT, 0x4002),
+    Variable("Status_Poison", Size.BIT, 0x4003),
+    Variable("Status_Sadness", Size.BIT, 0x4004),
+    Variable("Status_Fury", Size.BIT, 0x4005),
+    Variable("Status_Confu", Size.BIT, 0x4006),
+    Variable("Status_Silence", Size.BIT, 0x4007),
+    Variable("Status_Haste", Size.BIT, 0x4008),
+    Variable("Status_Slow", Size.BIT, 0x4009),
+    Variable("Status_Stop", Size.BIT, 0x400A),
+    Variable("Status_Frog", Size.BIT, 0x400B),
+    Variable("Status_Small", Size.BIT, 0x400C),
+    Variable("Status_SlowNumb", Size.BIT, 0x400D),
+    Variable("Status_Petrify", Size.BIT, 0x400E),
+    Variable("Status_Regen", Size.BIT, 0x400F),
+    Variable("Status_Barrier", Size.BIT, 0x4010),
+    Variable("Status_MBarrier", Size.BIT, 0x4011),
+    Variable("Status_Reflect", Size.BIT, 0x4012),
+    Variable("Status_Dual", Size.BIT, 0x4013),
+    Variable("Status_Shield", Size.BIT, 0x4014),
+    Variable("Status_DeathSentence", Size.BIT, 0x4015),
+    Variable("Status_Manipulate", Size.BIT, 0x4016),
+    Variable("Status_Berserk", Size.BIT, 0x4017),
+    Variable("Status_Peerless", Size.BIT, 0x4018),
+    Variable("Status_Paralysis", Size.BIT, 0x4019),
+    Variable("Status_Darkness", Size.BIT, 0x401A),
+    Variable("Status_DualDrain", Size.BIT, 0x401B),
+    Variable("Status_DeathForce", Size.BIT, 0x401C),
+    Variable("Status_Resist", Size.BIT, 0x401D),
+    Variable("Status_LuckyGirl", Size.BIT, 0x401E),
+    Variable("Status_Imprisoned", Size.BIT, 0x401F),
+
+    Constant("Enabled", Size.BIT, 0x4023),
+    Constant("MainScriptActive", Size.BIT, 0x4024),
+    Constant("PhysicalImmune", Size.BIT, 0x4028),
+    Constant("MagicalImmune", Size.BIT, 0x4029),
+    Constant("DeathImmune", Size.BIT, 0x402C),
+
+    Constant("IdleAnimID", Size.BYTE, 0x4080),
+    Constant("HurtAnimID", Size.BYTE, 0x4088),
+
+    Constant("PreviousAttacker", Size.WORD, 0x40D0),
+
+    Variable("HP", Size.TRIPLE, 0x4160),
+]
+
+builtins = [
+    Builtin("Global", doGlobal),
+    Builtin("Greatest", doGreatest),
+    Builtin("Mask", doMask),
+    Builtin("MyHP", doMyHP),
+    Builtin("MyMaxHP", doMyMaxHP),
+    Builtin("Perform", doPerform),
+    Builtin("Print", doPrint),
+    Builtin("Random", doRandom),
+    Builtin("RandomBit", doRandomBit),
+    Builtin("RandomBitEq", doRandomBitEq),
+    Builtin("WriteFlag", doWriteFlag),
+]
+
+startingEnv: dict[str, Builtin | Constant | Variable] = {}
+for var in variables:
+    startingEnv[var.name] = var
+for builtin in builtins:
+    startingEnv[builtin.name] = builtin
