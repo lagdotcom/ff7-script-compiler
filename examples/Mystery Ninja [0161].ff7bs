@@ -75,12 +75,12 @@ script Main {
   }
 }
 
-script counterDeath {
+script CounterDeath {
   GlobalAddress = 0x11;
   Global(1, 2);
 }
 
-script custom8 {
+script Custom8 {
   WriteFlag(Self, Enabled, 0);
   WriteFlag(Self, MainScriptActive, 0);
 }

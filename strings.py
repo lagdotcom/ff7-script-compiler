@@ -1,4 +1,3 @@
-
 ff7Text = {
     0: ' ',
     1: '!',
@@ -248,6 +247,8 @@ ff7Text = {
     0xfe: '{FUNC}',
     0xff: '{END}',
 }
+ff7TextInverted = {v: k for k, v in ff7Text.items()}
+ff7TextInverted[' '] = 0
 
 
 def translate(b: bytes):
@@ -258,3 +259,14 @@ def translate(b: bytes):
         else:
             s += chr(i)
     return s
+
+
+def untranslate(s: str):
+    b = bytes()
+    for c in s:
+        if c in ff7TextInverted:
+            b += bytes([ff7TextInverted[c]])
+        else:
+            raise Exception(
+                "Cannot encode '%s' (%d) in FF7 Text" % (c, ord(c)))
+    return b
