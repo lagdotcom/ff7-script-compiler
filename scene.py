@@ -222,6 +222,7 @@ class StatusEffect(IntFlag):
 
 class ElementRate(Enum):
     Death = 0
+    UNKNOWN1 = 1
     DoubleDamage = 2
     HalfDamage = 4
     Nullify = 5
@@ -968,12 +969,14 @@ class SceneBin:
             self.f.seek(i * 0x2000)
             self.blocks.append(SceneBlock(self.f))
 
-    def getFileContents(self, i: int):
-        block = i // 16
-        file = i % 16
-        ref = self.blocks[block].files[file]
-        self.f.seek(ref.blockStart + ref.start)
-        return decompress(self.f.read(ref.size).strip(bytes([255])))
+    def getFileContents(self, index: int):
+        for b in self.blocks:
+            if index >= len(b.files):
+                index -= len(b.files)
+                continue
+            ref = b.files[index]
+            self.f.seek(ref.blockStart + ref.start)
+            return decompress(self.f.read(ref.size).strip(bytes([255])))
 
     def dump(self, i: int, fn: str):
         open(fn, 'wb').write(self.getFileContents(i))

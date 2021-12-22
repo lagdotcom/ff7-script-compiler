@@ -13,6 +13,8 @@ class Precedence(Enum):
     ASSIGNMENT = auto()
     OR = auto()
     AND = auto()
+    BITWISE_OR = auto()
+    BITWISE_AND = auto()
     EQUALITY = auto()
     COMPARISON = auto()
     TERM = auto()

@@ -1,0 +1,154 @@
+const word MachineGun = 0x0110;
+const word Tonfa = 0x0111;
+
+var byte MyRow at 0x0000;
+var byte EnemyRows at 0x0020;
+var byte AllyRows at 0x0040;
+var byte Chance at 0x0060;
+var word ChosenAttack at 0x0080;
+
+script Main {
+  EnemyRows = 0;
+  AllyRows = 0;
+  MyRow = 0;
+
+  if (Mask(AllyMask, BackRow) == 0) {
+    AllyRows = AllyRows & 1;
+  }
+  if (Mask(AllyMask, BackRow) == 1) {
+    AllyRows = AllyRows & 2;
+  }
+
+  if (Mask(AllOpponentMask, BackRow) == 0) {
+    EnemyRows = EnemyRows & 1;
+  }
+  if (Mask(AllOpponentMask, BackRow) == 1) {
+    EnemyRows = EnemyRows & 2;
+  }
+
+  if (Mask(Self, BackRow) == 0) {
+    MyRow = 0;
+  } else {
+    MyRow = 1;
+  }
+
+  if (!MyRow) {
+    switch (EnemyRows) {
+      case 1:
+        Chance = 4;
+        if (!(Random() % Chance)) {
+          if ((EnemyRows & 2) == 2) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 1);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = MachineGun;
+        } else {
+          if ((EnemyRows & 1) == 1) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 0);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = Tonfa;
+        }
+        break;
+
+      case 2:
+        Chance = 8;
+        if (!(Random() % Chance)) {
+          if ((EnemyRows & 1) == 1) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 0);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = Tonfa;
+        } else {
+          if ((EnemyRows & 2) == 2) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 1);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = MachineGun;
+        }
+        break;
+
+      default:
+        Chance = 2;
+        if (!(Random() % Chance)) {
+          if ((EnemyRows & 2) == 2) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 1);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = MachineGun;
+        } else {
+          if ((EnemyRows & 1) == 1) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 0);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = Tonfa;
+        }
+    }
+  } else {
+    switch (EnemyRows) {
+      case 1:
+        Chance = 4;
+        if (!(Random() % Chance)) {
+          if ((EnemyRows & 1) == 1) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 0);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = Tonfa;
+        } else {
+          if ((EnemyRows & 2) == 2) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 1);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = MachineGun;
+        }
+        break;
+
+      case 2:
+        Chance = 8;
+        if (!(Random() % Chance)) {
+          if ((EnemyRows & 1) == 1) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 0);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = Tonfa;
+        } else {
+          if ((EnemyRows & 2) == 2) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 1);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = MachineGun;
+        }
+        break;
+
+      default:
+        Chance = 6;
+        if (!(Random() % Chance)) {
+          if ((EnemyRows & 1) == 1) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 0);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = Tonfa;
+        } else {
+          if ((EnemyRows & 2) == 2) {
+            TargetMask = RandomBitEq(Mask(AllOpponentMask, BackRow), 1);
+          } else {
+            TargetMask = RandomBit(AllOpponentMask);
+          }
+          ChosenAttack = MachineGun;
+        }
+    }
+  }
+
+  Perform(EnemyAttack, ChosenAttack);
+}

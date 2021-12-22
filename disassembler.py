@@ -200,14 +200,14 @@ class ProudClodText(Formatter):
 class NiceFormatter(Formatter):
     def showOp(self, location: int, op: Op):
         mne = ops[op]
-        print("%03x %02x\t       %s" % (location, op.value, mne))
+        print("%04x %02x\t       %s" % (location, op.value, mne))
 
     def showOpWithArg(self, location: int, op: Op, arg: ByteOperand | WordOperand | TripleOperand | StringOperand):
         mne = ops[op]
         argHex = hexBytes(arg.raw)[1:]
         if len(argHex) > 6:
             argHex = argHex[:3] + '...'
-        print("%03x %02x\t%-6s %s %s" % (location, op.value, argHex, mne, arg))
+        print("%04x %02x\t%-6s %s %s" % (location, op.value, argHex, mne, arg))
 
 
 if __name__ == "__main__":

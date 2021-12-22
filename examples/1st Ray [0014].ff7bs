@@ -1,0 +1,14 @@
+const word LaserCannon = 0x0117;
+
+var bit Delay at 0x0000;
+
+script Main {
+  if (!Delay) {
+    TargetMask = RandomBit(Greatest(Mask(AllOpponentMask, HP)));
+    Perform(EnemyAttack, LaserCannon);
+
+    Delay = 1;
+  } else {
+    Delay = 0;
+  }
+}
